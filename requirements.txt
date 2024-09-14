@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+firebase-admin
+pydantic-settings
+python-dotenv
+aioredis==1.3.1
