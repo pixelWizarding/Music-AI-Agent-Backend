@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from app.api import router as api_router
 from app.core.config import settings
+
 # from app.db.redis import connect_redis
 
-app = FastAPI(
-    title=settings.PROJECT_NAME
-)
+app = FastAPI(title=settings.PROJECT_NAME)
 
 app.include_router(api_router)
 
@@ -13,6 +12,7 @@ app.include_router(api_router)
 # async def startup_event():
 #     # Connect to Redis on startup
 #     await connect_redis()
+
 
 @app.get("/")
 async def read_root():

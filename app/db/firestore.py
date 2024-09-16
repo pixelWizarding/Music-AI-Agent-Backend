@@ -7,5 +7,6 @@ cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+
 def get_firestore_db():
     return db

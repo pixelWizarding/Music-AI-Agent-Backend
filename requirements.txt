@@ -4,3 +4,8 @@ firebase-admin
 pydantic-settings
 python-dotenv
 aioredis==1.3.1
+flake8
+black
+pylint
+mypy
+pre-commit
