@@ -44,7 +44,6 @@ venv.bak/
 # Google Cloud SDK configurations and secrets
 gcloud/
 gcloud_secrets/
-.gcloudignore
 
 
 # Deployment artifacts
