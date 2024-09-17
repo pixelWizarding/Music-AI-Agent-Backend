@@ -42,32 +42,3 @@ class CallSession(BaseModel):
     feedback: Optional[Feedback] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": "event_123",
-                "event_name": "Call to Client A",
-                "is_success": True,
-                "agent_id": "agent_123",
-                "company_id": "company_123",
-                "calls": [
-                    {
-                        "id": "call_123",
-                        "contact_person_name": "John Doe",
-                        "contact_person_name_kana": "ジョン ドゥ",
-                        "status": "Success",
-                        "audio_url": "https://example.com/call_123.mp3",
-                        "started_at": "2024-01-01T12:00:00Z",
-                        "ended_at": "2024-01-01T12:30:00Z",
-                    }
-                ],
-                "feedback": {
-                    "sentiment_analysis": "Positive",
-                    "feedback_score": 8.5,
-                    "updated_tone": "Cheerful",
-                },
-                "created_at": "2024-01-01T12:00:00Z",
-                "updated_at": "2024-01-02T12:00:00Z",
-            }
-        }
