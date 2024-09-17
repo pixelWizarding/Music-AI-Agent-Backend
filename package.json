@@ -4,6 +4,7 @@
   "description": "SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **Firestore** as the primary database and **Redis** for caching. The project handles contact management and provides APIs for creating, retrieving, and caching contact information.",
   "main": "index.js",
   "scripts": {
+    "start": "uvicorn app.main:app --reload",
     "lint": "flake8 ./app",
     "format": "black ./app",
     "deploy": "gcloud app deploy --quiet"
