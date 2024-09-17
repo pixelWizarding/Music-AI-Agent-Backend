@@ -27,7 +27,7 @@ SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **F
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-repo/shift-scall-backend.git
+   git clone https://github.com/SHIFT-JP/shift-scall-backend.git
    cd shift-scall-backend
    ```
 
@@ -50,9 +50,18 @@ SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **F
     uvicorn app.main:app --reload
     ```
 
-5. Access the API documentation:
+5. Format & Lint:
+
+    ```bash
+    npm run format
+    ```
+
+    ```bash
+    npm run lint
+    ```
+
+6. Access the API documentation:
     ```bash
     Swagger UI: http://127.0.0.1:8000/docs
     ReDoc: http://127.0.0.1:8000/redoc
     ```
-
