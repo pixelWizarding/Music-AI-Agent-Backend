@@ -1,12 +1,13 @@
-runtime: python39
+runtime: python39  # You can change this based on your Python version
+entrypoint: uvicorn app.main:app --host=0.0.0.0 --port $PORT
+
+instance_class: F2  # Set instance class according to your resource needs
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 1
+  max_instances: 5
 
 handlers:
   - url: /.*
     script: auto
-
-instance_class: F2  # Adjust this based on your app's resource needs
-
-env_variables:
-  FIREBASE_CREDENTIALS: "app/secrets/firebase_credentials.json"
-  REDIS_HOST: "10.52.199.70"
-  REDIS_PORT: "6379"

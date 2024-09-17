@@ -1,0 +1,29 @@
+# .gcloudignore
+# This file specifies files and directories that should be ignored when
+# deploying your app to Google Cloud using `gcloud app deploy`.
+
+# Python virtual environments
+.venv/
+env/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Local development files
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Test files
+tests/
+coverage/
+
+# Configuration files
+.env
+*.local
+
+# Git-related files
+.git/
+.gitignore
