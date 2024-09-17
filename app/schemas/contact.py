@@ -1,15 +1,10 @@
 from pydantic import BaseModel
 
 
-class ContactCreate(BaseModel):
-    company_id: int
-    company_name: str
+class Contact(BaseModel):
+    id: str
+    name: str
+    staff_name: str
+    staff_name_kana: str
     phone_number: str
-    HP_url: str
-
-
-class ContactResponse(BaseModel):
-    company_id: int
-    company_name: str
-    phone_number: str
-    HP_url: str
+    hp_url: str
