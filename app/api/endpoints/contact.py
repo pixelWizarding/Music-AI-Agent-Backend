@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.contact import ContactCreate
+from app.schemas.contact import Contact
 from app.db.firestore import get_firestore_db
 
 router = APIRouter()
 
 
 @router.post("/add-contact/")
-async def add_contact(contact: ContactCreate):
+async def add_contact(contact: Contact):
     db = get_firestore_db()
 
     docs = (
