@@ -47,7 +47,7 @@ SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **F
 
 4. RUN:
     ```bash
-    uvicorn app.main:app --reload
+    npm start
     ```
 
 5. Format & Lint:
@@ -59,6 +59,7 @@ SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **F
     ```bash
     npm run lint
     ```
+
 
 6. Access the API documentation:
     ```bash
