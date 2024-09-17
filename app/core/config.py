@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     FIREBASE_CREDENTIALS: str
     REDIS_HOST: str
@@ -8,5 +9,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env.dev"
+
 
 settings = Settings()
