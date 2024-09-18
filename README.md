@@ -49,6 +49,10 @@ SHIFT SCALL Backend is a backend service built with **FastAPI**, integrating **F
     ```bash
     npm start
     ```
+    OR
+    ```bash
+    docker compose up --build
+    ```
 
 5. Format & Lint:
 
