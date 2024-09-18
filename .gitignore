@@ -80,3 +80,7 @@ coverage.xml
 # Pycharm
 .idea/
 
+app/secrets/firebase_credentials.json
+
+
+
