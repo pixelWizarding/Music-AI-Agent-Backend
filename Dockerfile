@@ -1,17 +1,20 @@
-# Use the official python image as a base
-FROM python:3.9-slim
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
 
-# Set the working directory
+# Set the working directory in the container
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
-COPY . .
+COPY . /app
 
-# Install the dependencies
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Set the environment variables
-ENV FIREBASE_CREDENTIALS=app/secrets/firebase_credentials.json
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
 
-# Run the FastAPI app with Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Define environment variable
+ENV PYTHONUNBUFFERED=1
+
+# Command to run the FastAPI app using Uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
