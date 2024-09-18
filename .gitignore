@@ -46,7 +46,7 @@ gcloud/
 gcloud_secrets/
 
 # Firestore secrets
-app/secrets/
+app/.secrets/
 
 
 # Deployment artifacts
