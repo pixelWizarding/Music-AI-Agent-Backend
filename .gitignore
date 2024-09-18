@@ -45,9 +45,6 @@ venv.bak/
 gcloud/
 gcloud_secrets/
 
-# Firestore secrets
-app/secrets/
-
 
 # Deployment artifacts
 build/
