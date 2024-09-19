@@ -4,17 +4,17 @@ from typing import Optional, List
 from enum import Enum
 
 
-class CallStatus(str, Enum):
+class EventStatus(str, Enum):
     success = "Success"
     failure = "Failure"
     pending = "Pending"
 
 
-class Call(BaseModel):
+class Event(BaseModel):
     id: str
     contact_person_name: str
     contact_person_name_kana: Optional[str] = None
-    status: CallStatus
+    status: EventStatus
     audio_url: str
     started_at: datetime
     ended_at: datetime
@@ -32,13 +32,13 @@ class Feedback(BaseModel):
     updated_tone: str
 
 
-class CallSession(BaseModel):
+class EventSession(BaseModel):
     id: str
     event_name: str
     is_success: bool
     agent_id: str
     company_id: str
-    calls: List[Call]  # Multiple calls
+    events: List[Event]  # Multiple events
     feedback: Optional[Feedback] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
