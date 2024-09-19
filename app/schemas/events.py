@@ -10,12 +10,19 @@ class CallStatus(str, Enum):
     pending = "Pending"
 
 
+class Feedback(BaseModel):
+    sentiment_analysis: str
+    feedback_score: float
+    updated_tone: str
+
+
 class Call(BaseModel):
     id: str
     contact_person_name: str
     contact_person_name_kana: Optional[str] = None
     status: CallStatus
     audio_url: str
+    feedback: Optional[Feedback] = None
     started_at: datetime
     ended_at: datetime
 
@@ -26,19 +33,12 @@ class Call(BaseModel):
         return v
 
 
-class Feedback(BaseModel):
-    sentiment_analysis: str
-    feedback_score: float
-    updated_tone: str
-
-
-class CallSession(BaseModel):
+class Event(BaseModel):
     id: str
     event_name: str
     is_success: bool
     agent_id: str
     company_id: str
-    calls: List[Call]  # Multiple calls
-    feedback: Optional[Feedback] = None
+    events: Optional[List[Call]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

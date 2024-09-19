@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
-class CallHistory(BaseModel):
+class EventHistory(BaseModel):
     company_id: str
     call_id: str
     status: str
