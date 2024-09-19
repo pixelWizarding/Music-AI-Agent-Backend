@@ -16,3 +16,14 @@ async def add_event(event: Event):
     event_data = event.dict()
     db.collection("events").add(event_data)
     return {"message": "Events added successfully!"}
+
+
+@router.get("/get-events/")
+async def get_all_events():
+    db = get_firestore_db()
+
+    docs = db.collection("events").stream()
+
+    contacts = [doc.to_dict() for doc in docs]
+
+    return contacts
