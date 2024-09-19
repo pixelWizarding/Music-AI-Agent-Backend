@@ -59,3 +59,19 @@ async def update_event(id: str, event: Event):
     doc_ref.update(event.dict())
 
     return {"message": "Event updated successfully!"}
+
+
+@router.delete("/delete-event/{id}")
+async def delete_event(id: str):
+    db = get_firestore_db()
+
+    query = db.collection("events").where("id", "==", id).limit(1)
+    results = query.get()
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    doc_ref = results[0].reference
+    doc_ref.delete()
+
+    return {"message": "Event deleted successfully!"}
