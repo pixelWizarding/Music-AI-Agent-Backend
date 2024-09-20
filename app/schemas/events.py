@@ -18,6 +18,7 @@ class Feedback(BaseModel):
 
 class Call(BaseModel):
     id: str
+    company_id: str
     contact_person_name: str
     contact_person_name_kana: Optional[str] = None
     status: CallStatus
@@ -38,7 +39,15 @@ class Event(BaseModel):
     event_name: str
     is_success: bool
     agent_id: str
-    company_id: str
+    company_ids: List[str]
     events: Optional[List[Call]] = None
+    started_at: datetime
+    ended_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @validator("ended_at")
+    def check_ended_after_started(cls, v, values):
+        if "started_at" in values and v < values["started_at"]:
+            raise ValueError("ended_at must be after started_at")
+        return v
