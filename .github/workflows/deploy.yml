@@ -3,7 +3,7 @@ name: Deploy to Google App Engine
 on:
   push:
     tags:
-      - '*' 
+      - '*'  # Trigger the workflow on new tags
 
 jobs:
   deploy:
@@ -13,16 +13,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Cloud SDK
+    - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: your-gcp-project-id  # Replace with your GCP project ID
-        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # Ensure this secret is correctly set up in GitHub
+        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # This should reference the correct secret
 
-    - name: Authenticate Docker with Google Cloud
-      run: gcloud auth configure-docker
+    - name: Authenticate Google Cloud CLI
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      run: echo "$SERVICE_ACCOUNT_KEY" | gcloud auth activate-service-account --key-file=-
+
+    - name: Set GCP Project
+      run: gcloud config set project your-gcp-project-id  # Replace with your project ID
 
     - name: Deploy to Google App Engine
-      run: |
-        gcloud config set project your-gcp-project-id  # Ensure this is set to your project ID
-        gcloud app deploy --quiet
+      run: gcloud app deploy --quiet
