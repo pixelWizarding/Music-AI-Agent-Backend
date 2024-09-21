@@ -17,12 +17,15 @@ jobs:
       uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: sunny-diorama-435404-g9  # Replace with your GCP project ID
-        install_components: app-engine-python  # Add additional components if needed
+        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # This should reference the correct secret
 
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v1
-      with:
-        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # Ensure this secret is correctly set up in GitHub Secrets
+    - name: Authenticate Google Cloud CLI
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      run: echo "$SERVICE_ACCOUNT_KEY" | gcloud auth activate-service-account --key-file=-
+
+    - name: Set GCP Project
+      run: gcloud config set project sunny-diorama-435404-g9  # Replace with your project ID
 
     - name: Deploy to Google App Engine
       run: gcloud app deploy --quiet
