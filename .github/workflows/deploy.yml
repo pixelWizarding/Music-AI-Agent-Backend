@@ -3,7 +3,7 @@ name: Deploy to Google App Engine
 on:
   push:
     tags:
-      - '*'
+      - '*'  # Trigger the workflow on new tags
 
 jobs:
   deploy:
@@ -19,12 +19,10 @@ jobs:
         project_id: sunny-diorama-435404-g9
         install_components: app-engine-python
 
-    # Authenticate using Google Cloud SDK with the service account key
-    - name: Authenticate to Google Cloud
+    - name: Authenticate with Google Cloud
       uses: google-github-actions/auth@v1
       with:
-        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # Reference your service account JSON key stored in GitHub Secrets
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-    # Deploy the application to Google App Engine
     - name: Deploy to Google App Engine
       run: gcloud app deploy --quiet
