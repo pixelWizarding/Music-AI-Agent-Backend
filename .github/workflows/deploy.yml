@@ -3,7 +3,7 @@ name: Deploy to Google App Engine
 on:
   push:
     tags:
-      - '*'  # Trigger the workflow on new tags
+      - '*'  # Triggers the workflow when a new tag is pushed
 
 jobs:
   deploy:
@@ -13,19 +13,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # Set up the Google Cloud SDK without handling authentication here
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
-        project_id: sunny-diorama-435404-g9  # Replace with your GCP project ID
-        service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # This should reference the correct secret
+        project_id: sunny-diorama-435404-g9  # Replace with your actual GCP project ID
+        install_components: app-engine-python,app-engine-nodejs  # Specify any components required by your app
 
-    - name: Authenticate Google Cloud CLI
-      env:
-        SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-      run: echo "$SERVICE_ACCOUNT_KEY" | gcloud auth activate-service-account --key-file=-
+    # Authenticate using Google Cloud SDK with the service account key
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}  # Correctly reference your service account JSON key stored in GitHub Secrets
 
-    - name: Set GCP Project
-      run: gcloud config set project sunny-diorama-435404-g9  # Replace with your project ID
-
+    # Deploy the application to Google App Engine
     - name: Deploy to Google App Engine
       run: gcloud app deploy --quiet
