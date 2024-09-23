@@ -37,12 +37,13 @@ class Call(BaseModel):
 class Event(BaseModel):
     id: str
     event_name: str
-    is_success: bool
+    is_success: bool = False 
     agent_id: str
     company_ids: List[str]
     events: Optional[List[Call]] = None
     started_at: datetime
     ended_at: datetime
+    prompt: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
