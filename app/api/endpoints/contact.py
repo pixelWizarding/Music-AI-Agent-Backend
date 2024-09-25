@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.contact import Contact
 from app.db.firestore import get_firestore_db
+import uuid
 
 router = APIRouter()
 
@@ -8,6 +9,9 @@ router = APIRouter()
 @router.post("/add-contact/")
 async def add_contact(contact: Contact):
     db = get_firestore_db()
+
+    if contact.id is None:
+        contact.id = str(uuid.uuid4())
 
     docs = db.collection("contacts").where("id", "==", contact.id).stream()
     if list(docs):

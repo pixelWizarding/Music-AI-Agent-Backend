@@ -28,15 +28,21 @@ async def get_all_events():
     for event_doc in event_docs:
         event_data = event_doc.to_dict()
 
-        agent_docs = db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
+        agent_docs = (
+            db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
+        )
         agent_data = None
-        
+
         for agent_doc in agent_docs:
             agent_data = agent_doc.to_dict()
 
         if event_data.get("events"):
             for call in event_data["events"]:
-                company_docs = db.collection("contacts").where("id", "==", call["company_id"]).stream()
+                company_docs = (
+                    db.collection("contacts")
+                    .where("id", "==", call["company_id"])
+                    .stream()
+                )
                 company_data = None
 
                 for company_doc in company_docs:
@@ -45,7 +51,7 @@ async def get_all_events():
         event_response = {
             **event_data,
             "agent_name": agent_data["name"] if agent_data else None,
-            "events": event_data["events"]
+            "events": event_data["events"],
         }
         events.append(event_response)
 
@@ -67,24 +73,28 @@ async def get_event(id: str):
         raise HTTPException(status_code=404, detail="Event not found")
 
     # Fetch agent details using agent_id
-    agent_docs = db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
+    agent_docs = (
+        db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
+    )
     agent_data = None
 
     for agent_doc in agent_docs:
         agent_data = agent_doc.to_dict()
 
     if event_data.get("events"):
-            for call in event_data["events"]:
-                company_docs = db.collection("contacts").where("id", "==", call["company_id"]).stream()
-                company_data = None
+        for call in event_data["events"]:
+            company_docs = (
+                db.collection("contacts").where("id", "==", call["company_id"]).stream()
+            )
+            company_data = None
 
-                for company_doc in company_docs:
-                    company_data = company_doc.to_dict()
-                call["company_name"] = company_data["name"] if company_data else None
+            for company_doc in company_docs:
+                company_data = company_doc.to_dict()
+            call["company_name"] = company_data["name"] if company_data else None
     event_response = {
         **event_data,
         "agent_name": agent_data["name"] if agent_data else None,
-        "events": event_data["events"]
+        "events": event_data["events"],
     }
 
     return event_response

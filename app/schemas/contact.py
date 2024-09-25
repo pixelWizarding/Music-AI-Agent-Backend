@@ -1,8 +1,9 @@
 from pydantic import BaseModel
+from typing import Optional
 
 
 class Contact(BaseModel):
-    id: str
+    id: Optional[str] = None
     name: str
     staff_name: str
     staff_name_kana: str
