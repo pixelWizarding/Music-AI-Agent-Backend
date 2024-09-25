@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.contact import Contact
 from app.db.firestore import get_firestore_db
-import uuid
 
 router = APIRouter()
 
@@ -10,16 +9,25 @@ router = APIRouter()
 async def add_contact(contact: Contact):
     db = get_firestore_db()
 
-    if contact.id is None:
-        contact.id = str(uuid.uuid4())
+    contact_data = contact.dict(exclude_unset=True)
 
-    docs = db.collection("contacts").where("id", "==", contact.id).stream()
-    if list(docs):
-        raise HTTPException(status_code=400, detail="Company ID already exists")
+    if contact.id is None or contact.id.strip() == "":
+        creation_time, doc_ref = db.collection("contacts").add(contact_data)
 
-    contact_data = contact.dict()
-    db.collection("contacts").add(contact_data)
-    return {"message": "Contact added successfully!"}
+        contact_data["id"] = doc_ref.id
+    else:
+        contact_data["id"] = contact.id
+        existing_docs = (
+            db.collection("contacts").where("id", "==", contact.id).limit(1).get()
+        )
+        if existing_docs:
+            raise HTTPException(status_code=400, detail="Contact ID already exists")
+
+        doc_ref = db.collection("contacts").document(contact.id)
+
+    doc_ref.set(contact_data)
+
+    return {"message": "Contact added successfully!", "contact_id": contact_data["id"]}
 
 
 @router.get("/get-contacts/")
