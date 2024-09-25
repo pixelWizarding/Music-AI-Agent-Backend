@@ -37,7 +37,7 @@ class Call(BaseModel):
 class Event(BaseModel):
     id: str
     event_name: str
-    is_success: bool = False 
+    is_success: bool = False
     agent_id: str
     company_ids: List[str]
     events: Optional[List[Call]] = None
