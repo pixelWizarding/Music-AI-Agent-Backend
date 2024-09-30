@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from datetime import datetime, timezone
 from app.schemas.events import Event
 from app.db.firestore import get_firestore_db
 
@@ -28,21 +29,15 @@ async def get_all_events():
     for event_doc in event_docs:
         event_data = event_doc.to_dict()
 
-        agent_docs = (
-            db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
-        )
+        agent_docs = db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
         agent_data = None
-
+        
         for agent_doc in agent_docs:
             agent_data = agent_doc.to_dict()
 
         if event_data.get("events"):
             for call in event_data["events"]:
-                company_docs = (
-                    db.collection("contacts")
-                    .where("id", "==", call["company_id"])
-                    .stream()
-                )
+                company_docs = db.collection("contacts").where("id", "==", call["company_id"]).stream()
                 company_data = None
 
                 for company_doc in company_docs:
@@ -51,7 +46,7 @@ async def get_all_events():
         event_response = {
             **event_data,
             "agent_name": agent_data["name"] if agent_data else None,
-            "events": event_data["events"],
+            "events": event_data["events"]
         }
         events.append(event_response)
 
@@ -73,28 +68,24 @@ async def get_event(id: str):
         raise HTTPException(status_code=404, detail="Event not found")
 
     # Fetch agent details using agent_id
-    agent_docs = (
-        db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
-    )
+    agent_docs = db.collection("agents").where("id", "==", event_data["agent_id"]).stream()
     agent_data = None
 
     for agent_doc in agent_docs:
         agent_data = agent_doc.to_dict()
 
     if event_data.get("events"):
-        for call in event_data["events"]:
-            company_docs = (
-                db.collection("contacts").where("id", "==", call["company_id"]).stream()
-            )
-            company_data = None
+            for call in event_data["events"]:
+                company_docs = db.collection("contacts").where("id", "==", call["company_id"]).stream()
+                company_data = None
 
-            for company_doc in company_docs:
-                company_data = company_doc.to_dict()
-            call["company_name"] = company_data["name"] if company_data else None
+                for company_doc in company_docs:
+                    company_data = company_doc.to_dict()
+                call["company_name"] = company_data["name"] if company_data else None
     event_response = {
         **event_data,
         "agent_name": agent_data["name"] if agent_data else None,
-        "events": event_data["events"],
+        "events": event_data["events"]
     }
 
     return event_response
@@ -130,3 +121,70 @@ async def delete_event(id: str):
     doc_ref.delete()
 
     return {"message": "Event deleted successfully!"}
+
+
+@router.post("/trigger-scheduled-calls")
+async def trigger_scheduled_calls(background_tasks: BackgroundTasks):
+    db = get_firestore_db()
+    now = datetime.now(timezone.utc)
+    events = db.collection('events').where('started_at', '<=', now).where('is_success', '==', False).stream()
+
+    events_triggered = 0
+    for event in events:
+        event_data = event.to_dict()
+        event_id = event.id
+
+        try:
+            background_tasks.add_task(update_calls_data, event_data['recipient_phone_number'], event_data['agent_id'])
+
+            print(f"Triggering call for event {event_id}")
+            event.reference.update({
+                "is_success": True,
+                "updated_at": datetime.utcnow()
+            })
+            events_triggered += 1
+        except Exception as e:
+            print(f"Failed to trigger call for event {event_id}: {e}")
+
+    if events_triggered == 0:
+        return {"message": "No events triggered at this time."}
+
+    return {"message": f"{events_triggered} events triggered successfully."}
+
+import uuid
+
+async def append_calls_data(recipient_phone_number: str, agent_id: str):
+    db = firestore.Client()
+    # Fetch the events that have not been marked as successful
+    events_ref = db.collection('events').where('agent_id', '==', agent_id).stream()
+
+    for event in events_ref:
+        event_data = event.to_dict()
+        event_id = event.id
+        company_ids = event_data.get('company_ids', [])
+
+        call_results = []
+        for company_id in company_ids:
+            # Create a test call result for each company_id
+            call_result = {
+                "id": str(uuid.uuid4()),  # Generating a unique value for the call ID
+                "company_id": company_id,
+                "contact_person_name": "Jin",
+                "contact_person_name_kana": "Jin",  # Optional field, could be filled or left as None
+                "status": "Success",
+                "audio_url": "http://commondatastorage.googleapis.com/codeskulptor-assets/week7-brrring.m4a",
+                "started_at": datetime.utcnow(),
+                "ended_at": datetime.utcnow(),
+            }
+            call_results.append(call_result)
+
+        # Append the call results to the event's existing 'events' field
+        try:
+            event.reference.update({
+                "events": firestore.ArrayUnion(call_results),
+                "is_success": True,  # Marking the event as successfully triggered
+                "updated_at": datetime.utcnow()
+            })
+            print(f"Call results appended for event {event_id}")
+        except Exception as e:
+            print(f"Failed to update event {event_id}: {e}")

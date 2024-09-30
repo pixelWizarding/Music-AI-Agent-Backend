@@ -9,3 +9,5 @@ black
 pylint
 mypy
 pre-commit
+pyht
+openai
