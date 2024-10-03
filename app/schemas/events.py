@@ -5,9 +5,10 @@ from enum import Enum
 
 
 class CallStatus(str, Enum):
-    success = "Success"
-    failure = "Failure"
-    pending = "Pending"
+    appointment = "Appointment"
+    rejected = "Rejected"
+    refused = "Refused"
+    unreachable = "Unreachable"
 
 
 class Feedback(BaseModel):
@@ -21,7 +22,7 @@ class Call(BaseModel):
     company_id: str
     contact_person_name: str
     contact_person_name_kana: Optional[str] = None
-    status: CallStatus
+    status: Optional[CallStatus] = None
     audio_url: str
     feedback: Optional[Feedback] = None
     started_at: datetime
