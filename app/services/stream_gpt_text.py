@@ -4,7 +4,6 @@ from openai import OpenAI
 try:
     openai = OpenAI()
 except Exception as e:
-    print('aaa---->',e)
     openai = None
 
 def stream_gpt_text(prompt, ttfb_callback=None):
