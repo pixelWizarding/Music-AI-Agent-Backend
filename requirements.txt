@@ -9,3 +9,7 @@ black
 pylint
 mypy
 pre-commit
+pyht
+openai
+twilio
+python-multipart
