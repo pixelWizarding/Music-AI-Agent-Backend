@@ -76,18 +76,13 @@ async def call_prompt(prompt: str, to_phone_number: str):
 async def twilio_status(request: Request):
     form_data = await request.form()
 
-    # Get the call SID and call status from Twilio's callback data
     call_sid = form_data.get("CallSid")
     call_status = form_data.get("CallStatus")
 
-    # Handle the call status change
     print(f"Call SID: {call_sid}, Status: {call_status}")
 
-    # You can implement additional logic based on the status
     if call_status == "completed":
-        # Call has ended (either by caller or receiver)
         print(f"Call {call_sid} completed")
-        # Optionally clear prompts queue or perform other actions
     
     return {"status": "Callback received"}
 
@@ -98,9 +93,8 @@ async def recording_status(request: Request):
     # Get the recording details
     call_sid = form_data.get("CallSid")
     recording_sid = form_data.get("RecordingSid")
-    recording_url = form_data.get("RecordingUrl") + ".mp3"  # Get the URL of the recording
+    recording_url = form_data.get("RecordingUrl") + ".mp3"
 
-    # Log the recording details (you can save them in your database)
     print(f"Recording available for call {call_sid}: {recording_url}")
 
     return {"status": "Recording received", "recording_url": recording_url}
@@ -124,7 +118,7 @@ async def twilio_stream():
     response = VoiceResponse()
 
     if prompts_queue:
-        current_prompt = prompts_queue.pop(0)  # Get the next prompt
+        current_prompt = prompts_queue.pop(0)
         encoded_prompt = quote_plus(current_prompt)
         
         async with httpx.AsyncClient(timeout=30.0) as httpx_client:
