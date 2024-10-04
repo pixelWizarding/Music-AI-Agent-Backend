@@ -6,8 +6,12 @@ from fastapi.responses import Response
 from twilio.rest import Client as TwilioClient
 from twilio.twiml.voice_response import VoiceResponse
 from urllib.parse import quote_plus
-from app.services.stream_gpt_text import stream_gpt_text
+from app.services.stream_gpt_text import stream_gpt_text, stream_initial_gpt_response
+from app.db.firestore import get_firestore_db
+from app.schemas.events import Event
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from typing import Optional
 load_dotenv()
 
 router = APIRouter()
@@ -23,53 +27,89 @@ API_HEADERS = {
     "Authorization": f"Bearer {PLAY_HT_API_KEY}"  # Replace with your PlayHT API key
 }
 
+@router.get("/trigger_calls")
+async def trigger_scheduled_calls():
+  db = get_firestore_db()
+  current_time = datetime.utcnow() + timedelta(hours=9)
+  event_docs = db.collection("events").where('is_success', '==', False).where('started_at', '<', current_time).stream()
+  events = [doc.to_dict() for doc in event_docs]
+
+  for event in events:
+      for company_id in event['company_ids']:
+          contact_docs = db.collection("contacts").where("id", "==", company_id).stream()
+
+          contact_data = None
+          for doc in contact_docs:
+              contact_data = doc.to_dict()
+          
+          if contact_data:
+              to_phone_number = contact_data['phone_number']
+              prompt = event['prompt']
+              await call_prompt(to_phone_number=to_phone_number, voice=event['agent_id'], company=company_id, purpose=prompt, requester='Jin')
+
+          event_update_query = db.collection("events").where('id', '==', event['id']).stream()
+          event_update_docs = [doc for doc in event_update_query]
+
+          if event_update_docs:
+              event_ref = event_update_docs[0].reference
+              event_ref.update({'is_success': True, 'updated_at': datetime.utcnow()})
+
+  return {"status": "Calls triggered for events"}
+    
+
 @router.get("/say-prompt")
-async def say_prompt(prompt: str):
+async def say_prompt(voice: str, company: str, purpose: str, requester: str, prompt: Optional[str] = None):
   headers = {}
-  gpt_stream = stream_gpt_text(prompt, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
-  ssml_text = "<speak><p>"
-  for chunk in gpt_stream:
-      ssml_text += chunk
-  ssml_text += "</p></speak>"
-  payload = {
-      "method": "file",
-      "narrationStyle": "Neural",
-      "platform": "landing_demo",
-      "ssml": ssml_text,
-      "userId": PLAY_HT_USER_ID,
-      "voice": "ja-JP-Wavenet-C"
-  }
-  async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-      response = await httpx_client.post(PLAYHT_API_URL, json=payload, headers=API_HEADERS)
+  if not prompt:
+      gpt_stream = stream_initial_gpt_response(requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
+  else:
+      gpt_stream = stream_gpt_text(prompt, requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
+  
+  if gpt_stream is None:
+            raise ValueError("GPT stream generation failed, no response from OpenAI API.")
+  ssml_text = f"<speak>{''.join([chunk for chunk in gpt_stream])}</speak>"
 
-      if response.status_code != 200:
-          raise HTTPException(status_code=response.status_code, detail="Failed to synthesize audio")
-
-      audio_url = response.json().get("file")
-
-      if not audio_url:
-          raise HTTPException(status_code=500, detail="Audio URL not found")
+  audio_url = await generate_audio(ssml_text, voice)
 
   return {"audio_url": audio_url}
-  
+
+async def generate_audio(ssml_text: str, voice: str) -> str:
+  payload = {
+      "method": "file",
+      "narrationStyle": "Standard",
+      "platform": "landing_demo",
+      "ssml": ssml_text,
+      "userId": "XCFTFDCDPvXl26Q84SqmiPniLvG2",
+      "voice": voice
+  }
+
+  async with httpx.AsyncClient(timeout=30.0) as httpx_client:
+    response = await httpx_client.post(PLAYHT_API_URL, json=payload, headers=API_HEADERS)
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Failed to synthesize audio")
+
+    audio_url = response.json().get("file")
+    if not audio_url:
+        raise HTTPException(status_code=500, detail="Audio URL not found")
+
+  return audio_url  
 
 
 
 prompts_queue = []
-
 @router.post("/call-prompt")
-async def call_prompt(prompt: str, to_phone_number: str):
-  prompts_queue.append(prompt)
-
+async def call_prompt(to_phone_number: str, voice: str, company: str, purpose: str, requester: str):
   call = twilio_client.calls.create(
       to=to_phone_number,
       from_=TWILIO_PHONE_NUMBER,
-      url=f"https://6e29-78-46-38-10.ngrok-free.app/calls/twilio-stream",
-      status_callback=f"https://6e29-78-46-38-10.ngrok-free.app/calls/twilio-status",
+      url=f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}",
+      status_callback=f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-status",
       status_callback_event=['initiated', 'ringing', 'answered', 'completed'],
       record=True,
-      recording_status_callback=f"https://6e29-78-46-38-10.ngrok-free.app/calls/recording-status",
+      recording_status_callback=f"https://aef0-78-46-38-10.ngrok-free.app/calls/recording-status",
   )
+  prompts_queue.append('')
   return {"status": "Call initiated", "call_sid": call.sid}
 
 @router.post("/twilio-status")
@@ -99,22 +139,8 @@ async def recording_status(request: Request):
 
     return {"status": "Recording received", "recording_url": recording_url}
 
-@router.post("/transcription-status")
-async def transcription_status(request: Request):
-    form_data = await request.form()
-
-    # Get the transcription details
-    transcription_sid = form_data.get("TranscriptionSid")
-    transcription_text = form_data.get("TranscriptionText")
-    call_sid = form_data.get("CallSid")
-
-    # Log or save the transcription
-    print(f"Transcription for call {call_sid}: {transcription_text}")
-
-    return {"status": "Transcription received", "transcription_text": transcription_text}
-
 @router.post("/twilio-stream")
-async def twilio_stream():
+async def twilio_stream(voice: str, company: str, purpose: str, requester: str):
     response = VoiceResponse()
 
     if prompts_queue:
@@ -122,17 +148,17 @@ async def twilio_stream():
         encoded_prompt = quote_plus(current_prompt)
         
         async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-          res_url = f"https://6e29-78-46-38-10.ngrok-free.app/calls/say-prompt?prompt={encoded_prompt}"
+          res_url = f"https://aef0-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
           res = await httpx_client.get(res_url)
           if res.status_code != 200:
             raise HTTPException(status_code=res.status_code, detail="Failed to synthesize audio")
           audio_url = res.json().get("audio_url")
 
           response.play(audio_url)
-          response.redirect(f"https://6e29-78-46-38-10.ngrok-free.app/calls/twilio-stream")
+          response.redirect(f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}")
     else:
         response.pause(length=3)
-        response.redirect(f"https://6e29-78-46-38-10.ngrok-free.app/calls/twilio-stream")
+        response.redirect(f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}")
     
     return Response(content=str(response), media_type="application/xml")
 
