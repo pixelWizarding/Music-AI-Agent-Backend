@@ -4,7 +4,7 @@ from fastapi import HTTPException, APIRouter, Request
 from fastapi.responses import Response
 
 from twilio.rest import Client as TwilioClient
-from twilio.twiml.voice_response import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse, Gather
 from urllib.parse import quote_plus
 from app.services.stream_gpt_text import stream_gpt_text, stream_initial_gpt_response
 from app.db.firestore import get_firestore_db
@@ -12,6 +12,7 @@ from app.schemas.events import Event
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from typing import Optional
+from collections import defaultdict
 load_dotenv()
 
 router = APIRouter()
@@ -79,7 +80,7 @@ async def generate_audio(ssml_text: str, voice: str) -> str:
       "narrationStyle": "Standard",
       "platform": "landing_demo",
       "ssml": ssml_text,
-      "userId": "XCFTFDCDPvXl26Q84SqmiPniLvG2",
+      "userId": PLAY_HT_USER_ID,
       "voice": voice
   }
 
@@ -97,7 +98,7 @@ async def generate_audio(ssml_text: str, voice: str) -> str:
 
 
 
-prompts_queue = []
+call_data = defaultdict(lambda: {"count": 0, "receiver_speech": []})
 @router.post("/call-prompt")
 async def call_prompt(to_phone_number: str, voice: str, company: str, purpose: str, requester: str):
   call = twilio_client.calls.create(
@@ -109,7 +110,6 @@ async def call_prompt(to_phone_number: str, voice: str, company: str, purpose: s
       record=True,
       recording_status_callback=f"https://aef0-78-46-38-10.ngrok-free.app/calls/recording-status",
   )
-  prompts_queue.append('')
   return {"status": "Call initiated", "call_sid": call.sid}
 
 @router.post("/twilio-status")
@@ -140,29 +140,48 @@ async def recording_status(request: Request):
     return {"status": "Recording received", "recording_url": recording_url}
 
 @router.post("/twilio-stream")
-async def twilio_stream(voice: str, company: str, purpose: str, requester: str):
+async def twilio_stream(voice: str, company: str, purpose: str, requester: str, call_sid: Optional[str] = None):
     response = VoiceResponse()
 
-    if prompts_queue:
-        current_prompt = prompts_queue.pop(0)
-        encoded_prompt = quote_plus(current_prompt)
-        
-        async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-          res_url = f"https://aef0-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
-          res = await httpx_client.get(res_url)
-          if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail="Failed to synthesize audio")
-          audio_url = res.json().get("audio_url")
-
-          response.play(audio_url)
-          response.redirect(f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}")
+    if call_sid:
+        count = call_data[call_sid]["count"]
+        if count < len(call_data[call_sid]["receiver_speech"]):
+            current_prompt = call_data[call_sid]["receiver_speech"][count]
+        else:
+            current_prompt = ""
     else:
-        response.pause(length=3)
-        response.redirect(f"https://aef0-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}")
+        current_prompt = ""
     
+    encoded_prompt = quote_plus(current_prompt)
+
+    async with httpx.AsyncClient(timeout=30.0) as httpx_client:
+        res_url = f"https://aef0-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
+        res = await httpx_client.get(res_url)
+        if res.status_code != 200:
+            raise HTTPException(status_code=res.status_code, detail="Failed to synthesize audio")
+        audio_url = res.json().get("audio_url")
+        response.play(audio_url)
+        gather = Gather(
+            input="speech", 
+            action=f"/calls/gather-complete?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}", 
+            method="POST", 
+            timeout=5, # Please optimize this timeout.
+            language="ja-JP"
+        )
+        response.append(gather)
+
     return Response(content=str(response), media_type="application/xml")
 
-@router.post("/add-prompt")
-async def add_prompt(prompt: str):
-    prompts_queue.append(prompt)
-    return {"status": "Prompt added", "prompt": prompt}
+
+@router.post("/gather-complete")
+async def gather_complete(voice: str, company: str, purpose: str, requester: str, request: Request):
+    form_data = await request.form()
+    speech_result = form_data.get("SpeechResult")
+    call_sid = form_data.get("CallSid")
+    print(f"Receiver said in Japanese: {speech_result}")
+    call_data[call_sid]["receiver_speech"].append(speech_result)
+    call_data[call_sid]["count"] += 1
+    response = VoiceResponse()
+    response.redirect(f"/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&call_sid={call_sid}")
+    
+    return Response(content=str(response), media_type="application/xml")
