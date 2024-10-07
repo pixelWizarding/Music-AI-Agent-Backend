@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from typing import Optional
 from collections import defaultdict
+import random
 load_dotenv()
 
 router = APIRouter()
@@ -58,7 +59,8 @@ async def trigger_scheduled_calls():
                         call_sid=call_result['call_sid'],
                         company_id=company_id,
                         contact_person_name=requester,
-                        started_at=current_time
+                        started_at=current_time,
+                        status='4'
                     )
                 
                 except Exception as e:
@@ -188,10 +190,11 @@ async def recording_status(event_id: str, request: Request):
     except Exception as e:
         print(f"Error save call record: {str(e)}")
 
-    print(f"Recording available for call {event_id}: {recording_url}")
+    print(f"Recording available for call {call_sid}: {recording_url}")
 
     return {"status": "Recording received and updated", "recording_url": recording_url}
 
+PREFIX_SPEECHES = ["はい", "えと", "なるほど", "そうなんですね", "もしもし"]
 @router.post("/twilio-stream")
 async def twilio_stream(voice: str, company: str, purpose: str, requester: str, call_sid: Optional[str] = None):
     response = VoiceResponse()
@@ -218,8 +221,8 @@ async def twilio_stream(voice: str, company: str, purpose: str, requester: str, 
             input="speech", 
             action=f"/calls/gather-complete?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}", 
             method="POST", 
-            timeout=15, # Please optimize this timeout.
-            speech_timeout=3,
+            timeout=15,
+            speech_timeout=2,
             language="ja-JP"
         )
         response.append(gather)
@@ -241,6 +244,11 @@ async def gather_complete(voice: str, company: str, purpose: str, requester: str
         print("No speech detected, continuing the call")
 
     response = VoiceResponse()
+    prefix_speech = random.choice(PREFIX_SPEECHES)
+    prefix_ssml = f"<speak>{prefix_speech}</speak>"
+    prefix_audio_url = await generate_audio(prefix_ssml, voice)
+    response.play(prefix_audio_url)
+
     response.redirect(f"/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&call_sid={call_sid}")
     
     return Response(content=str(response), media_type="application/xml")
