@@ -15,7 +15,9 @@ def stream_gpt_text(prompt: str, requester: str, company: str, purpose: str, ttf
         "既に自己紹介は済んでいますので、これ以降はセールス担当者との対話に集中し、相手からのメッセージに応答する形で丁寧に会話を進めてください。"
         "次の応答にフォーカスしてください: "
         f"{prompt} についてお話し、お互いの目的に沿って進めてください。"
+        "相手が最終的な結論に達した場合、それを認識し、会話をまとめて終了してください。"
         f"目的は、{purpose} について話し合うためのアポイントを設定することです。"
+        "応答は簡潔で的を絞り、必要以上に繰り返さないようにしてください"
     )
     
     stream = openai.chat.completions.create(
@@ -77,3 +79,23 @@ def stream_initial_gpt_response(requester: str, company: str, purpose: str, ttfb
                     ttfb_callback(end_time - start_time)
 
             yield chunk.choices[0].delta.content
+
+def analyze_response(text: str):
+    assert openai is not None, "OpenAI API not initialized"
+    
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system", 
+                "content": (
+                    "Analyze the provided text in detail and extract the call result. "
+                    "If you think that appointment secure, return the result in the format: '1'. "
+                    "If not, return: '2'. Only provide the data in these two cases."
+                )
+            },
+            {"role": "user", "content": text}
+        ],
+    )
+    
+    return response.choices[0].message.content

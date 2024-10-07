@@ -3,36 +3,15 @@ from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from enum import Enum
 
-
-class CallStatus(str, Enum):
-    appointment = "Appointment"
-    rejected = "Rejected"
-    refused = "Refused"
-    unreachable = "Unreachable"
-
-
-class Feedback(BaseModel):
-    sentiment_analysis: str
-    feedback_score: float
-    updated_tone: str
-
-
 class Call(BaseModel):
-    id: str
+    call_sid: Optional[str] = None
     company_id: str
     contact_person_name: str
     contact_person_name_kana: Optional[str] = None
-    status: Optional[CallStatus] = None
-    audio_url: str
-    feedback: Optional[Feedback] = None
+    status: Optional[str] = None
+    audio_url: Optional[str] = None
     started_at: datetime
-    ended_at: datetime
-
-    @validator("ended_at")
-    def check_ended_after_started(cls, v, values):
-        if "started_at" in values and v < values["started_at"]:
-            raise ValueError("ended_at must be after started_at")
-        return v
+    ended_at: Optional[datetime] = None
 
 
 class Event(BaseModel):
