@@ -1,11 +1,16 @@
 import time
 from openai import OpenAI
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 try:
     openai = OpenAI()
+    openai.api_key = os.getenv("OPENAI_API_KEY")
 except Exception as e:
     openai = None
-
+    print(f"Error initializing OpenAI: {e}")
 
 def stream_gpt_text(prompt: str, requester: str, company: str, purpose: str, ttfb_callback=None):
     assert openai is not None, "OpenAI API not initialised"

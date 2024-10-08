@@ -131,9 +131,9 @@ async def call_prompt(to_phone_number: str, voice: str, company: str, purpose: s
         call = twilio_client.calls.create(
             to=to_phone_number,
             from_=TWILIO_PHONE_NUMBER,
-            url=f"https://beb1-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}",
+            url=f"https://d7e0-35-200-63-31.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}",
             record=True,
-            recording_status_callback=f"https://beb1-78-46-38-10.ngrok-free.app/calls/recording-status?event_id={event_id}",
+            recording_status_callback=f"https://d7e0-35-200-63-31.ngrok-free.app/calls/recording-status?event_id={event_id}",
         )
         return {"status": "Call initiated", "call_sid": call.sid}
     except Exception as e:
@@ -211,7 +211,7 @@ async def twilio_stream(voice: str, company: str, purpose: str, requester: str, 
     encoded_prompt = quote_plus(current_prompt)
 
     async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-        res_url = f"https://beb1-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
+        res_url = f"https://d7e0-35-200-63-31.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
         res = await httpx_client.get(res_url)
         if res.status_code != 200:
             raise HTTPException(status_code=res.status_code, detail="Failed to synthesize audio")
