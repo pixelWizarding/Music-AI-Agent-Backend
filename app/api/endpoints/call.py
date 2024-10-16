@@ -1,7 +1,10 @@
 import httpx
 import os
+import time
+from pyht import Client
+from pyht.client import TTSOptions, Format, Language
 from fastapi import HTTPException, APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from twilio.rest import Client as TwilioClient
 from twilio.twiml.voice_response import VoiceResponse, Gather
@@ -28,6 +31,14 @@ API_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {PLAY_HT_API_KEY}"  # Replace with your PlayHT API key
 }
+
+if os.getenv("PLAY_HT_USER_ID") and os.getenv("PLAY_HT_API_KEY"):
+  pht_client = Client(
+      user_id=os.getenv("PLAY_HT_USER_ID"),
+      api_key=os.getenv("PLAY_HT_API_KEY"),
+  )
+else:
+  pht_client = None
 
 def get_current_time():
     return datetime.utcnow() + timedelta(hours=9)
@@ -86,43 +97,60 @@ async def trigger_scheduled_calls():
     
 
 @router.get("/say-prompt")
-async def say_prompt(voice: str, company: str, purpose: str, requester: str, prompt: Optional[str] = None):
-  headers = {}
-  if not prompt:
-      gpt_stream = stream_initial_gpt_response(requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
-  else:
-      gpt_stream = stream_gpt_text(prompt, requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
-  
-  if gpt_stream is None:
-    raise ValueError("GPT stream generation failed, no response from OpenAI API.")
-  ssml_text = f"<speak>{''.join([chunk for chunk in gpt_stream])}</speak>"
+async def say_prompt(voice: str, company: str, purpose: str, requester: str, call_sid: Optional[str] = None):
+    print('call_sid --->', type(call_sid))
+    if call_sid:
+        count = call_data[call_sid]["count"]
+        if count <= len(call_data[call_sid]["receiver_speech"]):
+            current_prompt = call_data[call_sid]["receiver_speech"][count-1]
+        else:
+            current_prompt = ""
 
-  audio_url = await generate_audio(ssml_text, voice)
+        # Collect last responses from 0 to count - 2
+        if count > 1:
+            last_responses = call_data[call_sid]["receiver_speech"][:count-1]
+        else:
+            last_responses = []
+    else:
+        current_prompt = ""
+    
+    headers = {}
+    options = TTSOptions(
+        voice="s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json",
+        language=Language.JAPANESE,
+        sample_rate=44100,
+        speed=0.85,
+        format=Format.FORMAT_MP3
+    )
+    
 
-  return {"audio_url": audio_url}
+    if not current_prompt:
+        gpt_stream = stream_initial_gpt_response(requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}))
+    else:
+        gpt_stream = stream_gpt_text(current_prompt, requester, company, purpose, lambda ttfb: headers.update({"X-ChatGPT-TTFB": str(ttfb)}), last_responses=last_responses)
 
-async def generate_audio(ssml_text: str, voice: str) -> str:
-  payload = {
-      "method": "file",
-      "narrationStyle": "Standard",
-      "platform": "landing_demo",
-      "ssml": ssml_text,
-      "userId": PLAY_HT_USER_ID,
-      "voice": voice
-  }
+    if gpt_stream is None:
+        raise ValueError("GPT stream generation failed, no response from OpenAI API.")
 
-  async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-    response = await httpx_client.post(PLAYHT_API_URL, json=payload, headers=API_HEADERS)
+    gpt_full_response = ''.join([chunk for chunk in gpt_stream])
 
-    if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail="Failed to synthesize audio")
+    # Now that we have the complete response, send it to PlayHT
+    def audio_generator():
+        is_first_chunk = True
+        start_time = int(time.time() * 2000)
 
-    audio_url = response.json().get("file")
-    if not audio_url:
-        raise HTTPException(status_code=500, detail="Audio URL not found")
+        for chunk in pht_client.tts(gpt_full_response, options):
+            if is_first_chunk:
+                is_first_chunk = False
+                end_time = int(time.time() * 2000)
+                play_ht_ttfb = end_time - start_time
 
-  return audio_url  
+                chat_gpt_ttb = headers["X-ChatGPT-TTFB"]
+                print(f"ChatGPT TTFB: {chat_gpt_ttb}ms, PlayHT TTFB: {play_ht_ttfb}ms")
+                headers["X-PlayHT-TTFB"] = str(play_ht_ttfb)
+            yield chunk
 
+    return StreamingResponse(audio_generator(), media_type="audio/mpeg", headers=headers)
 
 
 call_data = defaultdict(lambda: {"count": 0, "receiver_speech": []})
@@ -131,9 +159,9 @@ async def call_prompt(to_phone_number: str, voice: str, company: str, purpose: s
         call = twilio_client.calls.create(
             to=to_phone_number,
             from_=TWILIO_PHONE_NUMBER,
-            url=f"https://d7e0-35-200-63-31.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}",
+            url=f"https://fc71-78-46-38-10.ngrok-free.app/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}",
             record=True,
-            recording_status_callback=f"https://d7e0-35-200-63-31.ngrok-free.app/calls/recording-status?event_id={event_id}",
+            recording_status_callback=f"https://fc71-78-46-38-10.ngrok-free.app/calls/recording-status?event_id={event_id}",
         )
         return {"status": "Call initiated", "call_sid": call.sid}
     except Exception as e:
@@ -194,41 +222,37 @@ async def recording_status(event_id: str, request: Request):
 
     return {"status": "Recording received and updated", "recording_url": recording_url}
 
-PREFIX_SPEECHES = ["はい", "えと", "なるほど", "そうなんですね", "もしもし"]
+PREFIX_SPEECHES = [
+    "はい、ありがとうございます。",
+    "えと、いつもありがとうございます。",
+    "なるほど、感謝いたします。",
+    "そうなんですね、ありがとうございます。",
+    "はい、ご連絡ありがとうございます。",
+    "ええ、すみません、ありがとうございます。",
+    "はい、どうもありがとうございます。",
+    "そうですね、ありがとうございます。"
+]
 @router.post("/twilio-stream")
 async def twilio_stream(voice: str, company: str, purpose: str, requester: str, call_sid: Optional[str] = None):
     response = VoiceResponse()
-
+    print("--->", call_sid)
     if call_sid:
-        count = call_data[call_sid]["count"]
-        if count <= len(call_data[call_sid]["receiver_speech"]):
-            current_prompt = call_data[call_sid]["receiver_speech"][count-1]
-        else:
-            current_prompt = ""
+        res_url = f"https://fc71-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&call_sid={call_sid}"
     else:
-        current_prompt = ""
-    
-    encoded_prompt = quote_plus(current_prompt)
+        res_url = f"https://fc71-78-46-38-10.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}"
 
-    async with httpx.AsyncClient(timeout=30.0) as httpx_client:
-        res_url = f"https://d7e0-35-200-63-31.ngrok-free.app/calls/say-prompt?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&prompt={encoded_prompt}"
-        res = await httpx_client.get(res_url)
-        if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail="Failed to synthesize audio")
-        audio_url = res.json().get("audio_url")
-        response.play(audio_url)
-        gather = Gather(
-            input="speech", 
-            action=f"/calls/gather-complete?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}", 
-            method="POST", 
-            timeout=15,
-            speech_timeout=2,
-            language="ja-JP"
-        )
-        response.append(gather)
+    response.play(res_url)
+    gather = Gather(
+        input="speech", 
+        action=f"/calls/gather-complete?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}", 
+        method="POST", 
+        timeout=15,
+        speech_timeout=2,
+        language="ja-JP"
+    )
+    response.append(gather)
 
     return Response(content=str(response), media_type="application/xml")
-
 
 @router.post("/gather-complete")
 async def gather_complete(voice: str, company: str, purpose: str, requester: str, request: Request):
@@ -243,12 +267,8 @@ async def gather_complete(voice: str, company: str, purpose: str, requester: str
     else:
         print("No speech detected, continuing the call")
 
+    
     response = VoiceResponse()
-    prefix_speech = random.choice(PREFIX_SPEECHES)
-    prefix_ssml = f"<speak>{prefix_speech}</speak>"
-    prefix_audio_url = await generate_audio(prefix_ssml, voice)
-    response.play(prefix_audio_url)
-
     response.redirect(f"/calls/twilio-stream?voice={quote_plus(voice)}&company={quote_plus(company)}&purpose={quote_plus(purpose)}&requester={quote_plus(requester)}&call_sid={call_sid}")
     
     return Response(content=str(response), media_type="application/xml")
