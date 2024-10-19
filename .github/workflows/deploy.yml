@@ -3,26 +3,26 @@ name: Deploy to Google App Engine
 on:
   push:
     tags:
-      - '*'  # Trigger the workflow on new tags
+      - "*" # Trigger the workflow on new tags
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
-      with:
-        project_id: sunny-diorama-435404-g9
-        install_components: app-engine-python
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: sunny-diorama-435404-g9
+          install_components: app-engine-python
 
-    - name: Authenticate with Google Cloud
-      uses: google-github-actions/auth@v1
-      with:
-        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-    - name: Deploy to Google App Engine
-      run: gcloud app deploy --quiet
+      - name: Deploy to Google App Engine
+        run: gcloud app deploy --quiet
