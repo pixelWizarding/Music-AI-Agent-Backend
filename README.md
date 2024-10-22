@@ -1,4 +1,4 @@
-# SHIFT SCALL Backend
+# SHIFT SCALL Backend Project
 
 ## Overview
 
